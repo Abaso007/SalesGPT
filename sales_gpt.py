@@ -64,19 +64,6 @@ class SalesConversationChain(LLMChain):
         """Get the response parser."""
         if use_custom_prompt:
             sales_agent_inception_prompt = custom_prompt
-            prompt = PromptTemplate(
-                template=sales_agent_inception_prompt,
-                input_variables=[
-                    "salesperson_name",
-                    "salesperson_role",
-                    "company_name",
-                    "company_business",
-                    "company_values",
-                    "conversation_purpose",
-                    "conversation_type",
-                    "conversation_history"
-                ],
-            )
         else:
             sales_agent_inception_prompt = (
             """Never forget your name is {salesperson_name}. You work as a {salesperson_role}.
@@ -118,19 +105,19 @@ Conversation history:
 {conversation_history}
 {salesperson_name}:"""
             )
-            prompt = PromptTemplate(
-                template=sales_agent_inception_prompt,
-                input_variables=[
-                    "salesperson_name",
-                    "salesperson_role",
-                    "company_name",
-                    "company_business",
-                    "company_values",
-                    "conversation_purpose",
-                    "conversation_type",
-                    "conversation_history"
-                ],
-            )
+        prompt = PromptTemplate(
+            template=sales_agent_inception_prompt,
+            input_variables=[
+                "salesperson_name",
+                "salesperson_role",
+                "company_name",
+                "company_business",
+                "company_values",
+                "conversation_purpose",
+                "conversation_type",
+                "conversation_history"
+            ],
+        )
         return cls(prompt=prompt, llm=llm, verbose=verbose)
 
 
@@ -174,17 +161,22 @@ class SalesGPT(Chain, BaseModel):
         self.conversation_stage_id = self.stage_analyzer_chain.run(
             conversation_history='\n'.join(self.conversation_history).rstrip("\n"),
             conversation_stage_id=self.conversation_stage_id,
-            conversation_stages='\n'.join([str(key)+': '+ str(value) for key, value in CONVERSATION_STAGES.items()])
-            )
-        
+            conversation_stages='\n'.join(
+                [
+                    f'{str(key)}: {str(value)}'
+                    for key, value in CONVERSATION_STAGES.items()
+                ]
+            ),
+        )
+
         print(f"Conversation Stage ID: {self.conversation_stage_id}")
         self.current_conversation_stage = self.retrieve_conversation_stage(self.conversation_stage_id)
-  
+
         print(f"Conversation Stage: {self.current_conversation_stage}")
         
     def human_step(self, human_input):
         # process human input
-        human_input = 'User: ' + human_input + ' <END_OF_TURN>'
+        human_input = f'User: {human_input} <END_OF_TURN>'
         self.conversation_history.append(human_input)
 
     @time_logger
@@ -206,10 +198,10 @@ class SalesGPT(Chain, BaseModel):
             conversation_purpose = self.conversation_purpose,
             conversation_type=self.conversation_type
         )
-        
+
         # Add agent's response to conversation history
         agent_name = self.salesperson_name
-        ai_message = agent_name + ': ' + ai_message
+        ai_message = f'{agent_name}: {ai_message}'
         self.conversation_history.append(ai_message)
         print(ai_message.replace('<END_OF_TURN>', ''))
         return {}
@@ -222,8 +214,8 @@ class SalesGPT(Chain, BaseModel):
         """Initialize the SalesGPT Controller."""
         stage_analyzer_chain = StageAnalyzerChain.from_llm(llm, verbose=verbose)
 
-        if 'use_custom_prompt' in kwargs.keys() and kwargs['use_custom_prompt'] == 'True':
-            
+        if 'use_custom_prompt' in kwargs and kwargs['use_custom_prompt'] == 'True':
+
             use_custom_prompt = deepcopy(kwargs['use_custom_prompt'])
             custom_prompt = deepcopy(kwargs['custom_prompt'])
 
@@ -235,12 +227,12 @@ class SalesGPT(Chain, BaseModel):
                 llm, verbose=verbose, use_custom_prompt=use_custom_prompt,
                 custom_prompt=custom_prompt
             )
-        
+
         else: 
             sales_conversation_utterance_chain = SalesConversationChain.from_llm(
                 llm, verbose=verbose
             )
-        
+
         return cls(
             stage_analyzer_chain=stage_analyzer_chain,
             sales_conversation_utterance_chain=sales_conversation_utterance_chain,
